@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 import os, glob
 from util import get_d2b_assessment_conn
-from datetime import datetime
+from datetime import datetime, date
 
 
 
@@ -44,6 +44,7 @@ def extract(s3, response, bucket_name):
             print(f"Successfully downloaded {file_name}")
     else:
         print('No object found in the specified bucket and prefix.')
+    return folder
 
 def transform():
     files = glob.glob('./orders_data/*')
@@ -52,19 +53,37 @@ def transform():
         folder = 'transformed_data'
         path = Path(folder) / file_name
         df = pd.read_csv(file)
-        df['ingestion_date'] = pd.Timestamp('now').strftime('%Y-%m-%d')
-        print(df.head())
+        df['ingest_date'] = datetime.today()
+        # print(df.info())
+        # print(df.head())
+        if file_name == 'shipment_deliveries':
+            df['shipment_date'] = pd.to_datetime(df['shipment_date'])
+            df['delivery_date'] = pd.to_datetime(df['delivery_date'])
+        elif file_name == 'orders':
+            df['order_date'] = pd.to_datetime(df['order_date'])
+        # print(df.info())
+        # print(df.head())
         df.to_csv(path, index=False)
+    return folder
 
 
 def load_to_db():
-    files = glob.glob('./transformed_data/*')
+    files = glob.glob('orders_data/*')
     engine = get_d2b_assessment_conn()
     for file in files:
-        file_name = file.split('/')[2]
+        print(file)
+        file_name = file.split('/')[1][:-4]
+        folder = 'transformed_data'
+        path = Path(folder) / file_name
         df = pd.read_csv(file)
-        df['ingestion_date'] = pd.to_datetime(datetime.now()).strftime('%Y-%m-%d')
-        df.info()
+        df['ingest_date'] = datetime.today()
+        # print(df.info())
+        # print(df.head())
+        if file_name == 'shipment_deliveries':
+            df['shipment_date'] = pd.to_datetime(df['shipment_date'])
+            df['delivery_date'] = pd.to_datetime(df['delivery_date'])
+        elif file_name == 'orders':
+            df['order_date'] = pd.to_datetime(df['order_date'])
         table_exist_quey = f"""
         select exists (select 1 from information_schema.tables where table_name = '{file_name}')
         """
@@ -81,6 +100,7 @@ def load_to_db():
             last_updated = pd.to_datetime(last_updated).strftime('%Y-%m-%d') # Convert to datetime.date object
             
             new_data = df[df['ingestion_date'] > last_updated]
+            print(new_data.info())
             new_data.to_sql(file_name, con=engine, schema='solochik6145_staging', index=False, if_exists='append')
             print(f'Successfully written {new_data.shape[0]} rows to {file_name} table')
       
@@ -99,8 +119,8 @@ def agg_public_holiday():
 def parent_etl():
     # schema = os.getenv("STAGING_SCHEMA")
     # s3, response, bucket_name = list_s3_objects()
-    # extract(s3, response, bucket_name)
-    # transform()
+    # folder = extract(s3, response, bucket_name)
+    # folder = transform()
     load_to_db()
     #agg_public_holiday()
 
