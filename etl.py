@@ -53,7 +53,7 @@ def transform():
         folder = 'transformed_data'
         path = Path(folder) / file_name
         df = pd.read_csv(file)
-        df['ingest_date'] = datetime.today()
+        df['ingest_date'] = datetime.today().w
         # print(df.info())
         # print(df.head())
         if file_name == 'shipment_deliveries':
@@ -71,14 +71,16 @@ def load_to_db():
     files = glob.glob('orders_data/*')
     engine = get_d2b_assessment_conn()
     for file in files:
-        print(file)
         file_name = file.split('/')[1][:-4]
         folder = 'transformed_data'
         path = Path(folder) / file_name
         df = pd.read_csv(file)
-        df['ingest_date'] = datetime.today()
-        # print(df.info())
-        # print(df.head())
+        df['ingestion_date'] = datetime.today()
+        df['day_of_week'] = datetime.today().weekday()
+        df['month'] = datetime.today().month
+        df['year'] = datetime.today().year
+        print(df.info())
+        print(df.head())
         if file_name == 'shipment_deliveries':
             df['shipment_date'] = pd.to_datetime(df['shipment_date'])
             df['delivery_date'] = pd.to_datetime(df['delivery_date'])
